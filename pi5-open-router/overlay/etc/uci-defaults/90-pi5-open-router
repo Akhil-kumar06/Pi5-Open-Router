@@ -1,0 +1,9 @@
+#!/bin/sh
+# Safe first boot: Ethernet remains LAN and Wi-Fi remains off until secured.
+# Configure Wi-Fi using LuCI before switching Ethernet to WAN.
+uci set system.@system[0].hostname='Pi5-OpenRouter'
+uci set network.lan.ipaddr='192.168.50.1'
+uci set network.lan.netmask='255.255.255.0'
+uci commit network
+uci commit system
+exit 0

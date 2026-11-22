@@ -1,0 +1,39 @@
+name: Build Pi 5 firmware
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['overlay/**', 'scripts/**', '.github/workflows/build.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ImageBuilder prerequisites
+        run: sudo apt-get update && sudo apt-get install -y zstd build-essential wget ca-certificates python3
+      - name: Download official OpenWrt ImageBuilder and check hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=https://downloads.openwrt.org/releases/25.12.6/targets/bcm27xx/bcm2712
+          NAME=openwrt-imagebuilder-25.12.6-bcm27xx-bcm2712.Linux-x86_64.tar.zst
+          wget -q "$BASE/$NAME" -O "$RUNNER_TEMP/$NAME"
+          echo '5a379d82bf1e134fc328c01d3de53350c3bca4603be69615581d165bef3867ab  '"$RUNNER_TEMP/$NAME" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/builder"
+          tar --zstd -xf "$RUNNER_TEMP/$NAME" --strip-components=1 -C "$RUNNER_TEMP/builder"
+      - name: Build custom Pi 5 image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/builder"
+          make image PROFILE=rpi-5 FILES="$GITHUB_WORKSPACE/overlay" PACKAGES='luci luci-proto-wireguard wireguard-tools kmod-wireguard wpad-basic-mbedtls' V=s
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          find bin/targets -type f \( -name '*rpi-5*factory.img.gz' -o -name '*rpi-5*sysupgrade.img.gz' \) -exec cp -v {} "$GITHUB_WORKSPACE/dist/" \;
+          (cd "$GITHUB_WORKSPACE/dist" && sha256sum *.img.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pi5-open-router-openwrt-25.12.6
+          path: dist/*
+          if-no-files-found: error

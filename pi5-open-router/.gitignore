@@ -1,0 +1,7 @@
+*.conf
+*.key
+*.pem
+secrets/
+dist/
+*.img
+*.img.gz
